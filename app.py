@@ -10,6 +10,11 @@ ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 app.secret_key = "your_secret_key"
 
+# Check if UPLOAD_FOLDER is a file, if so, delete it and create a directory
+if os.path.exists(UPLOAD_FOLDER) and not os.path.isdir(UPLOAD_FOLDER):
+    os.remove(UPLOAD_FOLDER)  # Remove the file
+    os.makedirs(UPLOAD_FOLDER)  # Create the directory
+
 # Function to check if the file extension is allowed
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
