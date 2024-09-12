@@ -1,1 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Image Upload</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bulma/0.9.3/css/bulma.min.css">
+</head>
+<body>
+<img src="./static/images/programming.gif" style="float:top" alt="Logo" class="logo">
+<div class="container">
+    <section class="section">
+        <h1 class="title">Upload and Manage Images</h1>
 
+        <!-- Image Upload Form -->
+        <form action="/upload" method="POST" enctype="multipart/form-data">
+            <div class="file has-name is-info">
+                <label class="file-label">
+                    <input class="file-input" type="file" name="image" accept="image/*">
+                    <span class="file-cta">
+                        <span class="file-icon">
+                            <i class="fas fa-upload"></i>
+                        </span>
+                        <span class="file-label">
+                            Choose an image…
+                        </span>
+                    </span>
+                </label>
+            </div>
+            <br>
+            <button class="button is-link" type="submit">Upload Image</button>
+        </form>
+    </section>
+
+    <section class="section">
+        <h2 class="subtitle">Uploaded Images</h2>
+
+        <div class="columns is-multiline" id="image-grid">
+            {% for image in images %}
+            <div class="column is-one-quarter" id="image-card-{{ image.id }}">
+                <div class="card">
+                    <div class="card-image">
+                        <figure class="image is-4by3">
+                            <img src="{{ url_for('static', filename='uploads/' ~ image.filename) }}" alt="Image">
+                        </figure>
+                    </div>
+                    <div class="card-content">
+                        <form action="/delete/{{ image.id }}" method="POST" class="delete-image-form" data-image-id="{{ image.id }}">
+                            <button class="button is-danger" type="submit">Delete</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </section>
+</div>
+
+<script src="https://kit.fontawesome.com/a076d05399.js" crossorigin="anonymous"></script>
+
+<script>
+// Function to handle delete action
+document.querySelectorAll('.delete-image-form').forEach(form => {
+    form.addEventListener('submit', function(event) {
+        event.preventDefault();
+
+        const imageId = this.dataset.imageId;
+        const url = this.action;
+
+        // Make an AJAX request to delete the image
+        fetch(url, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                // Remove the image card from the page
+                const imageCard = document.getElementById(`image-card-${data.image_id}`);
+                imageCard.parentNode.removeChild(imageCard);
+            } else {
+                alert('Error deleting image');
+            }
+        })
+        .catch(error => console.error('Error:', error));
+    });
+});
+</script>
+
+</body>
+</html>
