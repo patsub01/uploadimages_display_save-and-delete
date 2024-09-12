@@ -1,95 +1,70 @@
-from flask import Flask, render_template, request, redirect, url_for, jsonify
 import os
-import sqlite3
+from flask import Flask, request, redirect, url_for, render_template, send_from_directory, flash
 from werkzeug.utils import secure_filename
 
 app = Flask(__name__)
 
-# Folder to store uploaded images
+# Configuration
 UPLOAD_FOLDER = 'static/uploads/'
-app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
-
-# Ensure the upload directory exists
-if not os.path.exists(UPLOAD_FOLDER):
-    os.makedirs(UPLOAD_FOLDER)
-
-# Allowed extensions for image files
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
+app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+app.secret_key = "your_secret_key"
 
-# Database connection
-def get_db_connection():
-    conn = sqlite3.connect('db.sqlite3')
-    conn.row_factory = sqlite3.Row
-    return conn
+# Ensure the uploads folder exists
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
-# Create the table for storing image metadata
-def init_db():
-    conn = get_db_connection()
-    conn.execute('''
-        CREATE TABLE IF NOT EXISTS images (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            filename TEXT NOT NULL,
-            filepath TEXT NOT NULL
-        )
-    ''')
-    conn.commit()
-    conn.close()
-
-# Initialize the database
-init_db()
-
-# Check if the file has a valid extension
+# Function to check if the file extension is allowed
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
+# Route to display the upload form and images
 @app.route('/')
 def index():
-    conn = get_db_connection()
-    images = conn.execute('SELECT * FROM images').fetchall()
-    conn.close()
+    # List all images in the upload folder
+    images = os.listdir(app.config['UPLOAD_FOLDER'])
     return render_template('index.html', images=images)
 
+# Route to handle image upload
 @app.route('/upload', methods=['POST'])
-def upload_image():
-    if 'image' not in request.files:
+def upload_file():
+    # Check if the POST request has the file part
+    if 'file' not in request.files:
+        flash('No file part')
         return redirect(request.url)
-
-    file = request.files['image']
-
+    
+    file = request.files['file']
+    
+    # If no file is selected
     if file.filename == '':
+        flash('No selected file')
         return redirect(request.url)
 
+    # Check if the file is allowed and save it
     if file and allowed_file(file.filename):
         filename = secure_filename(file.filename)
-        filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-        file.save(filepath)
-
-        conn = get_db_connection()
-        conn.execute('INSERT INTO images (filename, filepath) VALUES (?, ?)', (filename, filepath))
-        conn.commit()
-        conn.close()
-
+        file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
+        flash('File successfully uploaded')
         return redirect(url_for('index'))
 
-    return redirect(request.url)
+# Route to serve uploaded images
+@app.route('/uploads/<filename>')
+def uploaded_file(filename):
+    return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
 
-# Updated delete route to return a JSON response
-@app.route('/delete/<int:image_id>', methods=['POST'])
-def delete_image(image_id):
-    conn = get_db_connection()
-    image = conn.execute('SELECT * FROM images WHERE id = ?', (image_id,)).fetchone()
+# Route to delete an image
+@app.route('/delete/<filename>', methods=['POST'])
+def delete_file(filename):
+    try:
+        file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+        if os.path.exists(file_path):
+            os.remove(file_path)
+            flash(f'{filename} has been deleted.')
+        else:
+            flash(f'File {filename} not found.')
+    except Exception as e:
+        flash(f'Error deleting file: {str(e)}')
+    return redirect(url_for('index'))
 
-    if image:
-        os.remove(image['filepath'])  # Remove the file from the server
-        conn.execute('DELETE FROM images WHERE id = ?', (image_id,))
-        conn.commit()
-        conn.close()
-
-        # Return a success response with the image ID
-        return jsonify({'success': True, 'image_id': image_id})
-
-    conn.close()
-    return jsonify({'success': False}), 404
-
-if __name__ == '__main__':
+# Main entry point
+if __name__ == "__main__":
     app.run(debug=True)
